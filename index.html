@@ -110,10 +110,11 @@ body.ro #v-cursos section>.fila,body.ro #v-colores section>.fila{display:none!im
     <img class="logo-login" data-logo alt="Logo Instituto Santa Rosa de Lima">
     <h2>Ingresar</h2>
     <div class="fila">
-      <input id="lgUser" placeholder="Usuario" autocomplete="username" aria-label="Usuario">
-      <input id="lgPass" type="password" placeholder="Contraseña" autocomplete="current-password" aria-label="Contraseña">
+      <input id="lgUser" placeholder="Usuario" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" aria-label="Usuario">
+      <input id="lgPass" type="password" placeholder="Contraseña" autocomplete="current-password" autocapitalize="none" autocorrect="off" spellcheck="false" aria-label="Contraseña">
       <button id="lgBtn">Entrar</button>
       <div id="lgErr" class="err"></div>
+      <div id="lgEst" class="vacio" style="font-size:.85rem"></div>
     </div>
   </section>
 </div>
@@ -248,7 +249,13 @@ let saveRemote = null;
 let ROL = null, QUIEN = "";
 let U = { admin: null, veedores: [], def: true };
 let saveUsersRemote = null, listoU;
-let usersState = "unknown";
+let usersState = "unknown", tiempo = false;
+const setEst = () => {
+  const e = $("#lgEst"); if (!e) return;
+  e.textContent = { ok: "✔ Usuarios sincronizados con Firebase.", missing: "Conectado. Todavía no hay usuarios guardados (se usa el admin inicial).", local: "Modo local (sin Firebase).", error: "⚠ Sin acceso a los usuarios en Firebase (revisá las reglas). Se usan datos locales de este dispositivo." }[usersState] || (tiempo ? "⚠ Firebase no responde. Se usan datos locales de este dispositivo." : "Conectando con Firebase…");
+};
+const setUS = v => { usersState = v; setEst(); };
+setTimeout(() => { tiempo = true; setEst(); }, 8000);
 const usuariosListos = new Promise(r => { listoU = r; setTimeout(r, 8000); });
 const norm = () => { S.colores = S.colores || []; S.cursos = S.cursos || []; S.dias = S.dias || []; S.dias.forEach(d => d.p = d.p || {}); };
 try { const l = localStorage.getItem("semana-mate-v2"); if (l) S = JSON.parse(l); norm(); } catch (e) {}
@@ -541,15 +548,16 @@ function iniciarLogin() {
   $("#lgBtn").onclick = async () => {
     const u = $("#lgUser").value.trim().toLowerCase(), p = $("#lgPass").value, err = $("#lgErr");
     err.textContent = "Verificando…";
+    const okP = async c => (await okCred(c, p)) || (p !== p.trim() && await okCred(c, p.trim()));
     await usuariosListos;
     if (!U.admin) {
       if (usersState !== "missing" && usersState !== "local") { err.textContent = "No se pudieron cargar los usuarios. Revisá la conexión y reintentá."; return; }
       U.admin = await mkCred("admin1234"); U.def = true; U.veedores = U.veedores || []; saveU();
     }
     let rol = null, quien = "";
-    if (u === admUser().toLowerCase() && await okCred(U.admin, p)) { rol = "admin"; quien = admUser(); }
-    else { const v = (U.veedores || []).find(x => x.nombre.toLowerCase() === u); if (v && await okCred(v, p)) { rol = "veedor"; quien = v.nombre; } }
-    if (!rol) { err.textContent = "Usuario o contraseña incorrectos."; return; }
+    if (u === admUser().toLowerCase() && await okP(U.admin)) { rol = "admin"; quien = admUser(); }
+    else { const v = (U.veedores || []).find(x => x.nombre.toLowerCase() === u); if (v && await okP(v)) { rol = "veedor"; quien = v.nombre; } }
+    if (!rol) { err.textContent = "Usuario o contraseña incorrectos." + (usersState === "ok" || usersState === "local" ? "" : " Este dispositivo no pudo sincronizar con Firebase, así que puede estar usando usuarios locales distintos a los de la PC."); return; }
     ROL = rol; QUIEN = quien; err.textContent = ""; $("#lgPass").value = "";
     sessionStorage.setItem("semana-mate-ses", JSON.stringify({ rol, quien }));
     ir("inicio");
@@ -560,7 +568,7 @@ function iniciarLogin() {
 
 /* ---------- Firebase ---------- */
 async function iniciarFirebase() {
-  if (!firebaseConfig.apiKey || firebaseConfig.apiKey === "PEGAR_AQUI") { $("#estado").textContent = ""; usersState = "local"; listoU(); return; }
+  if (!firebaseConfig.apiKey || firebaseConfig.apiKey === "PEGAR_AQUI") { $("#estado").textContent = ""; setUS("local"); listoU(); return; }
   try {
     const base = "https://www.gstatic.com/firebasejs/10.12.2/";
     const { initializeApp } = await import(base + "firebase-app.js");
@@ -572,11 +580,11 @@ async function iniciarFirebase() {
     onSnapshot(refU, snap => {
       if (snap.metadata.hasPendingWrites) return;
       if (snap.exists() && snap.data().admin) {
-        U = snap.data(); U.veedores = U.veedores || []; usersState = "ok";
+        U = snap.data(); U.veedores = U.veedores || []; setUS("ok");
         try { localStorage.setItem("semana-mate-users", JSON.stringify(U)); } catch (e) {}
-      } else if (!snap.metadata.fromCache) { usersState = "missing"; if (U.admin) saveU(); }
+      } else if (!snap.metadata.fromCache) { setUS("missing"); if (U.admin) saveU(); }
       listoU();
-    }, () => { usersState = "error"; $("#estado").textContent = "No se pueden leer los usuarios en Firebase. Revisá las reglas de Firestore para semana/usuarios."; listoU(); });
+    }, () => { setUS("error"); $("#estado").textContent = "No se pueden leer los usuarios en Firebase. Revisá las reglas de Firestore para semana/usuarios."; listoU(); });
     saveRemote = data => setDoc(ref, data).catch(() => { $("#estado").textContent = "No se pudo guardar en Firebase. Revisá las reglas de Firestore."; });
     onSnapshot(ref, snap => {
       if (snap.metadata.hasPendingWrites) return;
@@ -592,6 +600,7 @@ async function iniciarFirebase() {
 render();
 iniciarFirebase();
 iniciarLogin();
+setEst();
 </script>
 </body>
 </html>

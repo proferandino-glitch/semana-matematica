@@ -67,6 +67,18 @@ header #logo{height:76px}
 .dia{border-left-color:var(--fl)}
 .card{border-top-color:var(--fl)}
 .tab.on{background:var(--acc);color:#fff;box-shadow:inset 0 -4px 0 var(--fl)}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:16px}
+.kpi{background:var(--bg);border-radius:8px;padding:10px 14px;display:flex;flex-direction:column}
+.kpi span{color:var(--mut);font-size:.85rem}
+.kpi strong{font-size:1.5rem}
+.brow{display:grid;grid-template-columns:150px 1fr 70px;gap:10px;align-items:center;margin:10px 0}
+.bname{font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.btrack{background:#ecebe6;border-radius:8px;height:30px;overflow:hidden}
+.bfill{height:100%;border-radius:8px;border:1px solid #0003;transition:width .4s}
+.bval{font-weight:700;text-align:right;font-size:1.15rem}
+.grande{font-size:2.2rem;font-weight:700}
+@media(max-width:520px){.brow{grid-template-columns:100px 1fr 56px}}
+@media(prefers-reduced-motion:reduce){.bfill{transition:none}}
 </style>
 </head>
 <body>
@@ -95,6 +107,7 @@ header #logo{height:76px}
       <button class="card" data-ir="cursos"><strong>Cursos</strong><span id="cnK"></span></button>
       <button class="card" data-ir="colores"><strong>Colores</strong><span id="cnC"></span></button>
       <button class="card" data-ir="totales"><strong>Totales</strong><span id="cnT"></span></button>
+      <button class="card" data-ir="dashboard"><strong>Dashboard</strong><span>Puntajes por color en gráfico</span></button>
     </div>
   </div>
 
@@ -141,6 +154,18 @@ header #logo{height:76px}
     <h2 style="margin-top:18px">Posiciones por color</h2>
     <div class="scroll"><table id="tPos"></table></div>
   </section>
+  </div>
+  <div id="v-dashboard" hidden>
+    <button class="sec volver" data-ir="inicio">‹ Volver</button>
+    <section>
+      <h2>Dashboard</h2>
+      <div id="dashKpi" class="kpis"></div>
+      <div id="dashBars"></div>
+    </section>
+    <section>
+      <h2>Puntaje total por color</h2>
+      <div id="dashCards" class="det"></div>
+    </section>
   </div>
 </main>
 
@@ -230,7 +255,21 @@ function renderDias() {
       </div>
     </div>`;
 }
-function totales() { totalesTablas(); renderCards(); }
+function dashboard() {
+  const cs = [...S.colores].sort((a, b) => totC(b) - totC(a));
+  const max = Math.max(1, ...cs.map(totC));
+  $("#dashKpi").innerHTML = cs.length ? `
+    <div class="kpi"><span>Colores</span><strong>${cs.length}</strong></div>
+    <div class="kpi"><span>Días cargados</span><strong>${S.dias.length}</strong></div>
+    <div class="kpi"><span>Puntos en total</span><strong>${r2(cs.reduce((a, c) => a + totC(c), 0))}</strong></div>
+    <div class="kpi"><span>Va primero</span><strong>${totC(cs[0]) > 0 ? esc(cs[0].nombre) : "—"}</strong></div>` : "";
+  $("#dashBars").innerHTML = cs.length ? cs.map((c, i) => `
+    <div class="brow"><div class="bname">${i + 1}° ${dot(c)}${esc(c.nombre)}</div>
+      <div class="btrack"><div class="bfill" style="width:${Math.max(0, totC(c) / max * 100)}%;background:${c.color}"></div></div>
+      <div class="bval">${totC(c)}</div></div>`).join("") : `<p class="vacio">Agregá colores y cargá puntajes para ver el dashboard.</p>`;
+  $("#dashCards").innerHTML = S.colores.map(c => `<div class="bloque" style="border-top:6px solid ${c.color}"><strong>${esc(c.nombre)}</strong><div class="grande">${totC(c)}</div></div>`).join("");
+}
+function totales() { totalesTablas(); renderCards(); dashboard(); }
 function renderCards() {
   $("#cnC").textContent = S.colores.length + (S.colores.length === 1 ? " color" : " colores");
   $("#cnK").textContent = S.cursos.length + (S.cursos.length === 1 ? " curso" : " cursos");
@@ -238,7 +277,7 @@ function renderCards() {
   $("#cnT").textContent = top && totC(top) > 0 ? "Va primero: " + top.nombre + " (" + totC(top) + ")" : "Sin puntajes todavía";
 }
 function ir(v) {
-  ["inicio", "colores", "cursos", "totales"].forEach(x => $("#v-" + x).hidden = x !== v);
+  ["inicio", "colores", "cursos", "totales", "dashboard"].forEach(x => $("#v-" + x).hidden = x !== v);
   render(); window.scrollTo(0, 0);
 }
 function detalle() {

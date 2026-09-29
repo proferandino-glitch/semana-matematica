@@ -322,23 +322,25 @@ document.addEventListener("click", ev => {
 $("#xls").onclick = () => {
   if (!S.colores.length || !S.cursos.length) return alert("Primero cargá los cursos y después los colores.");
   const head = ["Curso", ...S.colores.map(c => c.nombre)];
-  const wb = XLSX.utils.book_new(), usados = new Set();
-  const nombreHoja = t => {
-    let n = (t || "Hoja").replace(/[\\\/?*\[\]:]/g, " ").trim().slice(0, 28) || "Hoja", f = n, i = 2;
-    while (usados.has(f.toLowerCase())) f = n + " " + i++;
-    usados.add(f.toLowerCase()); return f;
-  };
-  const add = (t, rows) => XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), nombreHoja(t));
-
-  add("Totales", [head,
-    ...S.cursos.map(k => [k.nombre, ...S.colores.map(c => totCK(c, k))]),
-    ["TOTAL GENERAL", ...S.colores.map(c => totC(c))]]);
-  add("Posiciones", [["Puesto", "Color", "Total"],
-    ...[...S.colores].sort((a, b) => totC(b) - totC(a)).map((c, i) => [i + 1, c.nombre, totC(c)])]);
-  S.dias.forEach(d => add([d.nombre, d.juego].filter(Boolean).join(" "), [
-    [[d.nombre, d.fecha ? d.fecha.split("-").reverse().join("/") : "", d.juego].filter(Boolean).join(" - ")], head,
-    ...S.cursos.map(k => [k.nombre, ...S.colores.map(c => d.p[key(c, k)] ?? "")]),
-    ["Total del día", ...S.colores.map(c => totDC(d, c))]]));
+  const fecha = f => f ? f.split("-").reverse().join("/") : "";
+  const rows = [["ISRL - Semana de la Matemática"], []];
+  // 1) cada día, uno debajo del otro
+  S.dias.forEach(d => {
+    rows.push([[d.nombre, fecha(d.fecha), d.juego].filter(Boolean).join(" - ")], head);
+    S.cursos.forEach(k => rows.push([k.nombre, ...S.colores.map(c => d.p[key(c, k)] ?? "")]));
+    rows.push(["Total del día", ...S.colores.map(c => totDC(d, c))], []);
+  });
+  // 2) totales por curso y color, con el total general
+  rows.push(["TOTALES POR CURSO Y COLOR"], head);
+  S.cursos.forEach(k => rows.push([k.nombre, ...S.colores.map(c => totCK(c, k))]));
+  rows.push(["TOTAL GENERAL", ...S.colores.map(c => totC(c))], []);
+  // 3) posiciones
+  rows.push(["POSICIONES"], ["Puesto", "Color", "Total"]);
+  [...S.colores].sort((a, b) => totC(b) - totC(a)).forEach((c, i) => rows.push([i + 1, c.nombre, totC(c)]));
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  ws["!cols"] = [{ wch: 34 }, ...S.colores.map(() => ({ wch: 14 }))];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Semana de la Matemática");
   XLSX.writeFile(wb, "ISRL-semana-de-la-matematica.xlsx");
 };
 

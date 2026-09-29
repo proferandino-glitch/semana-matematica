@@ -79,6 +79,10 @@ header #logo{height:76px}
 .grande{font-size:2.2rem;font-weight:700}
 @media(max-width:520px){.brow{grid-template-columns:100px 1fr 56px}}
 @media(prefers-reduced-motion:reduce){.bfill{transition:none}}
+.lema{font-size:.82rem;margin-top:3px;color:#e5e5e5}
+.pastel{background:#fdecd6;border-color:#f1d3a6}
+.pastel .tab{background:#fff}
+.pastel .tab.on{background:var(--acc)}
 </style>
 </head>
 <body>
@@ -88,13 +92,14 @@ header #logo{height:76px}
     <div>
       <div class="inst">ISRL</div>
       <h1>Semana de la Matemática</h1>
+      <div class="lema">Plan Integral de Matemática. SOMOS RED.</div>
     </div>
   </div>
   <div id="estado"></div>
 </header>
 <main>
   <div id="v-inicio">
-  <section>
+  <section class="pastel">
     <div class="fila" style="justify-content:space-between">
       <h2 style="margin:0">Día y juego</h2>
       <button id="addDia" class="sec">Agregar día</button>

@@ -248,7 +248,8 @@ let saveRemote = null;
 let ROL = null, QUIEN = "";
 let U = { admin: null, veedores: [], def: true };
 let saveUsersRemote = null, listoU;
-const usuariosListos = new Promise(r => { listoU = r; setTimeout(r, 4000); });
+let usersState = "unknown";
+const usuariosListos = new Promise(r => { listoU = r; setTimeout(r, 8000); });
 const norm = () => { S.colores = S.colores || []; S.cursos = S.cursos || []; S.dias = S.dias || []; S.dias.forEach(d => d.p = d.p || {}); };
 try { const l = localStorage.getItem("semana-mate-v2"); if (l) S = JSON.parse(l); norm(); } catch (e) {}
 try { const l = localStorage.getItem("semana-mate-users"); if (l) U = JSON.parse(l); } catch (e) {}
@@ -447,14 +448,29 @@ const saveU = () => {
   try { localStorage.setItem("semana-mate-users", JSON.stringify(U)); } catch (e) {}
   if (saveUsersRemote) saveUsersRemote(JSON.parse(JSON.stringify(U)));
 };
-const hashPw = async (pw, salt) => {
-  const t = salt + ":" + pw;
-  if (window.crypto && crypto.subtle) {
-    const b = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(t));
-    return [...new Uint8Array(b)].map(x => x.toString(16).padStart(2, "0")).join("");
+function sha256(str) {
+  const by = new TextEncoder().encode(str), l = by.length, n = ((l + 9 + 63) >> 6) << 6, w = new Uint8Array(n);
+  w.set(by); w[l] = 128; const dv = new DataView(w.buffer); dv.setUint32(n - 4, l * 8, false);
+  const K = [], H = [];
+  for (let c = 2, i = 0; i < 64; c++) {
+    let p = true; for (let d = 2; d * d <= c; d++) if (c % d === 0) { p = false; break; }
+    if (p) { if (i < 8) H[i] = (Math.pow(c, .5) % 1) * 4294967296 | 0; K[i++] = (Math.pow(c, 1 / 3) % 1) * 4294967296 | 0; }
   }
-  let h = 5381; for (const ch of t) h = ((h * 33) ^ ch.charCodeAt(0)) >>> 0; return "f" + h;
-};
+  const R = (x, k) => (x >>> k) | (x << (32 - k)), W = new Array(64);
+  for (let o = 0; o < n; o += 64) {
+    for (let i = 0; i < 16; i++) W[i] = dv.getUint32(o + i * 4, false);
+    for (let i = 16; i < 64; i++) { const a = W[i - 15], c = W[i - 2]; W[i] = (W[i - 16] + (R(a, 7) ^ R(a, 18) ^ (a >>> 3)) + W[i - 7] + (R(c, 17) ^ R(c, 19) ^ (c >>> 10))) | 0; }
+    let [a, b, c, d, e, f, g, h] = H;
+    for (let i = 0; i < 64; i++) {
+      const t1 = (h + (R(e, 6) ^ R(e, 11) ^ R(e, 25)) + ((e & f) ^ (~e & g)) + K[i] + W[i]) | 0;
+      const t2 = ((R(a, 2) ^ R(a, 13) ^ R(a, 22)) + ((a & b) ^ (a & c) ^ (b & c))) | 0;
+      h = g; g = f; f = e; e = (d + t1) | 0; d = c; c = b; b = a; a = (t1 + t2) | 0;
+    }
+    [a, b, c, d, e, f, g, h].forEach((v, i) => H[i] = (H[i] + v) | 0);
+  }
+  return H.map(x => (x >>> 0).toString(16).padStart(8, "0")).join("");
+}
+const hashPw = async (pw, salt) => sha256(salt + ":" + pw);
 const mkCred = async pw => { const salt = uid() + uid(); return { salt, hash: await hashPw(pw, salt) }; };
 const okCred = async (c, pw) => !!c && (await hashPw(pw, c.salt)) === c.hash;
 const msg = t => { $("#uMsg").textContent = t; };
@@ -526,7 +542,10 @@ function iniciarLogin() {
     const u = $("#lgUser").value.trim().toLowerCase(), p = $("#lgPass").value, err = $("#lgErr");
     err.textContent = "Verificando…";
     await usuariosListos;
-    if (!U.admin) { U.admin = await mkCred("admin1234"); U.def = true; U.veedores = U.veedores || []; saveU(); }
+    if (!U.admin) {
+      if (usersState !== "missing" && usersState !== "local") { err.textContent = "No se pudieron cargar los usuarios. Revisá la conexión y reintentá."; return; }
+      U.admin = await mkCred("admin1234"); U.def = true; U.veedores = U.veedores || []; saveU();
+    }
     let rol = null, quien = "";
     if (u === admUser().toLowerCase() && await okCred(U.admin, p)) { rol = "admin"; quien = admUser(); }
     else { const v = (U.veedores || []).find(x => x.nombre.toLowerCase() === u); if (v && await okCred(v, p)) { rol = "veedor"; quien = v.nombre; } }
@@ -541,7 +560,7 @@ function iniciarLogin() {
 
 /* ---------- Firebase ---------- */
 async function iniciarFirebase() {
-  if (!firebaseConfig.apiKey || firebaseConfig.apiKey === "PEGAR_AQUI") { $("#estado").textContent = ""; listoU(); return; }
+  if (!firebaseConfig.apiKey || firebaseConfig.apiKey === "PEGAR_AQUI") { $("#estado").textContent = ""; usersState = "local"; listoU(); return; }
   try {
     const base = "https://www.gstatic.com/firebasejs/10.12.2/";
     const { initializeApp } = await import(base + "firebase-app.js");
@@ -549,15 +568,15 @@ async function iniciarFirebase() {
     const db = getFirestore(initializeApp(firebaseConfig));
     const ref = doc(db, "semana", "datos");
     const refU = doc(db, "semana", "usuarios");
-    saveUsersRemote = d => setDoc(refU, d).catch(() => {});
+    saveUsersRemote = d => setDoc(refU, d).catch(() => { $("#estado").textContent = "No se pudieron guardar los usuarios en Firebase. Revisá las reglas de Firestore para semana/usuarios."; });
     onSnapshot(refU, snap => {
       if (snap.metadata.hasPendingWrites) return;
       if (snap.exists() && snap.data().admin) {
-        U = snap.data(); U.veedores = U.veedores || [];
+        U = snap.data(); U.veedores = U.veedores || []; usersState = "ok";
         try { localStorage.setItem("semana-mate-users", JSON.stringify(U)); } catch (e) {}
-      }
+      } else if (!snap.metadata.fromCache) { usersState = "missing"; if (U.admin) saveU(); }
       listoU();
-    }, () => listoU());
+    }, () => { usersState = "error"; $("#estado").textContent = "No se pueden leer los usuarios en Firebase. Revisá las reglas de Firestore para semana/usuarios."; listoU(); });
     saveRemote = data => setDoc(ref, data).catch(() => { $("#estado").textContent = "No se pudo guardar en Firebase. Revisá las reglas de Firestore."; });
     onSnapshot(ref, snap => {
       if (snap.metadata.hasPendingWrites) return;

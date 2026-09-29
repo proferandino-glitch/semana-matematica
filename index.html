@@ -50,9 +50,11 @@ tr.sum td{font-weight:700;border-top:2px solid var(--ink)}
 .inst{font-weight:700;letter-spacing:2px;color:var(--fl)}
 .lema{font-size:.82rem;margin-top:3px;color:#e5e5e5}
 .volver{margin-top:16px}
-.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:14px;margin:16px 0}
-.card{background:var(--card);color:var(--ink);border:1px solid var(--line);border-top:5px solid var(--fl);border-radius:10px;padding:18px;text-align:left;display:flex;flex-direction:column;gap:4px;font-size:1.1rem}
-.card span{color:var(--mut);font-size:.9rem}
+.cards{display:flex;gap:8px;margin:12px 0;overflow-x:auto;padding-bottom:2px}
+.card{flex:1 0 auto;min-width:96px;background:var(--card);color:var(--ink);border:1px solid var(--line);border-top:4px solid var(--fl);border-radius:8px;padding:6px 12px;text-align:left;display:flex;flex-direction:column;gap:0;font-size:.95rem}
+.card span{color:var(--mut);font-size:.72rem;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.card.on{background:var(--acc);color:#fff}
+.card.on span{color:#ddd}
 .card:hover{border-color:var(--acc)}
 .det{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
 .bloque{border:1px solid var(--line);border-radius:8px;padding:10px 12px}
@@ -120,6 +122,14 @@ body.ro #v-cursos section>.fila,body.ro #v-colores section>.fila{display:none!im
 </div>
 
 <main>
+  <nav class="cards" aria-label="Secciones">
+    <button class="card" data-ir="inicio"><strong>Inicio</strong><span>Día y juego</span></button>
+    <button class="card" data-ir="cursos"><strong>Cursos</strong><span id="cnK"></span></button>
+    <button class="card" data-ir="colores"><strong>Colores</strong><span id="cnC"></span></button>
+    <button class="card" data-ir="totales"><strong>Totales</strong><span id="cnT"></span></button>
+    <button class="card" data-ir="dashboard"><strong>Dashboard</strong><span>Gráfico</span></button>
+    <button class="card admin-only" data-ir="usuarios"><strong>Usuarios</strong><span>Accesos</span></button>
+  </nav>
   <div id="v-inicio">
     <section class="pastel">
       <div class="fila" style="justify-content:space-between">
@@ -129,13 +139,6 @@ body.ro #v-cursos section>.fila,body.ro #v-colores section>.fila{display:none!im
       <div id="tabs" class="fila" style="margin-top:10px"></div>
       <div id="dias"></div>
     </section>
-    <div class="cards">
-      <button class="card" data-ir="cursos"><strong>Cursos</strong><span id="cnK"></span></button>
-      <button class="card" data-ir="colores"><strong>Colores</strong><span id="cnC"></span></button>
-      <button class="card" data-ir="totales"><strong>Totales</strong><span id="cnT"></span></button>
-      <button class="card" data-ir="dashboard"><strong>Dashboard</strong><span>Puntajes por color en gráfico</span></button>
-      <button class="card admin-only" data-ir="usuarios"><strong>Usuarios</strong><span>Contraseña y veedores</span></button>
-    </div>
   </div>
 
   <div id="v-cursos" hidden>
@@ -498,6 +501,8 @@ function aplicarRol() {
   document.body.classList.toggle("ro", ROL === "veedor");
   if (ROL === "veedor") document.querySelectorAll("main input").forEach(i => i.disabled = true);
   $("#quien").textContent = ROL === "admin" ? "Administrador" : ROL ? "Veedor: " + QUIEN : "";
+  const cv = [...document.querySelectorAll("[id^=v-]")].find(x => !x.hidden);
+  document.querySelectorAll(".card").forEach(c => c.classList.toggle("on", !!cv && c.dataset.ir === cv.id.slice(2)));
   ojos();
 }
 function renderUsuarios() {

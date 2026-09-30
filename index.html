@@ -56,6 +56,8 @@ tr.sum td{font-weight:700;border-top:2px solid var(--ink)}
 .card.on{background:var(--acc);color:#fff}
 .card.on span{color:#ddd}
 .card:hover{border-color:var(--acc)}
+.dia th:not(:first-child),.dia td:not(:first-child),#tTot th:not(:first-child),#tTot td:not(:first-child){text-align:center}
+.dia td input[type=number]{display:block;margin:auto}
 .det{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
 .bloque{border:1px solid var(--line);border-radius:8px;padding:10px 12px}
 .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:16px}
@@ -188,6 +190,10 @@ body.ro #v-cursos section>.fila,body.ro #v-colores section>.fila{display:none!im
 
   <div id="v-dashboard" hidden>
     <button class="sec volver" data-ir="inicio">‹ Volver</button>
+    <section>
+      <h2>🏆 Los 3 cursos con más puntaje de cada color</h2>
+      <div id="dashTop" class="det"></div>
+    </section>
     <section>
       <h2>Dashboard</h2>
       <div id="dashKpi" class="kpis"></div>
@@ -327,11 +333,16 @@ function renderDias() {
 }
 function dashboard() {
   const cs = [...S.colores].sort((a, b) => totC(b) - totC(a));
+  const topK = c => S.cursos.map(k => ({ k, t: totCK(c, k) })).filter(x => x.t > 0).sort((a, b) => b.t - a.t).slice(0, 3);
+  $("#dashTop").innerHTML = cs.length && totC(cs[0]) > 0 ? cs.map((c, i) => `
+    <div class="bloque" style="border-top:6px solid ${c.color}">
+      <div>${dot(c)}<strong>${esc(c.nombre)}</strong> · ${totC(c)} pts${i === 0 ? ` <span style="color:var(--fl);font-weight:700">🏆 Color ganador</span>` : ""}</div>
+      ${topK(c).length ? `<table>${topK(c).map((x, j) => `<tr><td>${["🥇", "🥈", "🥉"][j]} ${esc(x.k.nombre)}</td><td class="num"><strong>${x.t}</strong></td></tr>`).join("")}</table>` : `<p class="vacio">Sin puntajes todavía.</p>`}
+    </div>`).join("") : `<p class="vacio">Todavía no hay puntajes cargados.</p>`;
   const max = Math.max(1, ...cs.map(totC));
   $("#dashKpi").innerHTML = cs.length ? `
     <div class="kpi"><span>Colores</span><strong>${cs.length}</strong></div>
     <div class="kpi"><span>Días cargados</span><strong>${S.dias.length}</strong></div>
-    <div class="kpi"><span>Puntos en total</span><strong>${r2(cs.reduce((a, c) => a + totC(c), 0))}</strong></div>
     <div class="kpi"><span>Va primero</span><strong>${totC(cs[0]) > 0 ? esc(cs[0].nombre) : "—"}</strong></div>` : "";
   $("#dashBars").innerHTML = cs.length ? cs.map((c, i) => `
     <div class="brow"><div class="bname">${i + 1}° ${dot(c)}${esc(c.nombre)}</div>
